@@ -6,19 +6,18 @@ use tokio::prelude::*;
 use futures::Future;
 use reqwest::r#async::Client;
 
-type MyFuture = Future<Item = Result<(), reqwest::Error>, Error = ()> + Send;
 fn run(url: &str, n: usize, c: usize) -> impl Future<Item=(), Error=()> {
     let client = Client::new();
 
-    let mut futures: Vec<Vec<Box<MyFuture>>> = Vec::new();
-    let mut current: Vec<Box<MyFuture>> = Vec::with_capacity(c);
+    let mut futures: Vec<Vec<Wrapper<_>>> = Vec::new();
+    let mut current: Vec<Wrapper<_>> = Vec::with_capacity(c);
     for _ in 0 .. n {
         let future = make_request(&client, url);
         if current.len() < c {
-            current.push(Box::new(future));
+            current.push(Wrapper(future));
         } else {
             let old = std::mem::replace(&mut current, Vec::with_capacity(c));
-            current.push(Box::new(future));
+            current.push(Wrapper(future));
             futures.push(old);
         }
     }
@@ -113,5 +112,16 @@ impl<I> Future for JoinAllSerial<I>
         } else {
             Ok(Async::NotReady)
         }
+    }
+}
+
+struct Wrapper<T> (T);
+
+impl <F> Future for Wrapper<F> where F: Future{
+    type Item = F::Item;
+    type Error = F::Error;
+
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+        self.0.poll()
     }
 }
