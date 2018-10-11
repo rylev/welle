@@ -6,26 +6,40 @@ use tokio::prelude::*;
 use futures::Future;
 use reqwest::r#async::Client;
 
+type MyFuture = Future<Item = Result<(), reqwest::Error>, Error = ()> + Send;
 fn run(url: &str, n: usize, c: usize) -> impl Future<Item=(), Error=()> {
     let client = Client::new();
 
-    let mut futures: Vec<Box<Future<Item = Result<(), reqwest::Error>, Error = ()> + Send>> = Vec::new();
-    for x in 0 .. c {
-        let mut requests = Vec::new();
-        for y in 0 .. n {
-            requests.push(client.get(url).send());
+    let mut futures: Vec<Vec<Box<MyFuture>>> = Vec::new();
+    let mut current: Vec<Box<MyFuture>> = Vec::with_capacity(c);
+    for _ in 0 .. n {
+        let future = make_request(&client, url);
+        if current.len() < c {
+            current.push(Box::new(future));
+        } else {
+            let old = std::mem::replace(&mut current, Vec::with_capacity(c));
+            current.push(Box::new(future));
+            futures.push(old);
         }
-        let future = join_all_serial(requests).then(move |result| {
-            Ok(result.map(|_| ()))
-        });
-        futures.push(Box::new(future));
+    }
+    if current.len() > 0 {
+        futures.push(current)
     }
 
-    future::join_all(futures).map(|_| ())
+    let chunks = futures.into_iter().map(|chunk| future::join_all(chunk));
+
+    join_all_serial(chunks).map(|_| ())
+}
+
+fn make_request(client: &Client, url: &str) -> impl Future<Item = Result<(), reqwest::Error>, Error = ()> + Send {
+    client.get(url).send().inspect(move |_| {
+    }).then(move |result| {
+        Ok(result.map(|_| ()))
+    })
 }
 
 fn main() {
-    tokio::run(run("http://localhost:3000/echo", 5, 10))
+    tokio::run(run("http://localhost:3000/echo", 5000, 10))
 }
 
 #[derive(Debug)]
