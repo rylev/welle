@@ -9,23 +9,16 @@ use reqwest::r#async::Client;
 fn run(url: &str, n: usize, c: usize) -> impl Future<Item=(), Error=()> {
     let client = Client::new();
 
-    let mut futures: Vec<Vec<Wrapper<_>>> = Vec::new();
-    let mut current: Vec<Wrapper<_>> = Vec::with_capacity(c);
-    for _ in 0 .. n {
-        let future = make_request(&client, url);
-        if current.len() < c {
-            current.push(Wrapper(future));
-        } else {
-            let old = std::mem::replace(&mut current, Vec::with_capacity(c));
-            current.push(Wrapper(future));
-            futures.push(old);
-        }
-    }
-    if current.len() > 0 {
-        futures.push(current)
-    }
+    let mut futures : Vec<Wrapper<_>> =
+        (0 .. n)
+        .into_iter()
+        .map(|_| Wrapper(make_request(&client, url)))
+        .collect();
 
-    let chunks = futures.into_iter().map(|chunk| future::join_all(chunk));
+    let chunks =
+        (0 .. n / c)
+        .into_iter()
+        .map(move |_| future::join_all(futures.split_off(c)));
 
     join_all_serial(chunks).map(|_| ())
 }
