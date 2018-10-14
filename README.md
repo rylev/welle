@@ -6,15 +6,19 @@ Welle is a tool for benchmarking servers similar to [ApacheBench](https://httpd.
 
 ```txt
 USAGE:
-    welle [OPTIONS] --request-count <NUMBER>
+    welle [OPTIONS] <URL> --num-requests <NUMBER>
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
 OPTIONS:
-    -c, --concurrent-count <NUMBER>    Number of in flight requests allowed at a time.
-    -n, --request-count <NUMBER>       Total number of requests to make
+    -c, --concurrent-requests <NUMBER>    Number of in flight requests allowed at a time [default: 1]
+    -m, --method <METHOD>                 HTTP method to use [default: GET]
+    -n, --num-requests <NUMBER>           Total number of requests to make
+
+ARGS:
+    <URL>    URL to request
 ```
 
 ## Building

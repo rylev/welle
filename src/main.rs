@@ -13,8 +13,9 @@ struct Config {
     #[structopt(
         short = "n",
         long = "num-requests",
+        value_name = "NUMBER",
         required = true,
-        parse(try_from_str = "parse_number_of_requests")
+        raw(validator = "parse_number_of_requests")
     )]
     request_count: usize,
 
@@ -22,6 +23,7 @@ struct Config {
     #[structopt(
         short = "c",
         long = "concurrent-requests",
+        value_name = "NUMBER",
         default_value = "1"
     )]
     concurrent_count: usize,
@@ -31,6 +33,7 @@ struct Config {
         short = "m",
         long = "method",
         default_value = "GET",
+        value_name = "METHOD",
         parse(try_from_str = "parse_method")
     )]
     method: Method,
@@ -244,12 +247,12 @@ fn parse_method(str: &str) -> Result<Method, String> {
     Method::try_from(str).map_err(|_| format!("unrecognized method: {}", str))
 }
 
-fn parse_number_of_requests(n: &str) -> Result<usize, String> {
+fn parse_number_of_requests(n: String) -> Result<(), String> {
     n.parse::<usize>()
-        .map_err(|_| String::from(""))
+        .map_err(|_| format!("'{}' is not a valid positive number", n))
         .and_then(|n| {
             if n != 0 {
-                Ok(n)
+                Ok(())
             } else {
                 Err(String::from("number of requests must be greater than 0"))
             }
