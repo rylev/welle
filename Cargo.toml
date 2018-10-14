@@ -5,6 +5,7 @@ authors = ["Ryan Levick <ryan.levick@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+http = "0.1"
 reqwest = "0.9"
 tokio = "0.1"
 futures = "0.1"

@@ -1,30 +1,14 @@
-extern crate futures;
-extern crate reqwest;
-extern crate structopt;
-extern crate tokio;
-
 use futures::{stream, Future};
-use reqwest::{r#async::Client, Url};
+use http::HttpTryFrom;
+use reqwest::{r#async::Client, Method, Url};
 use std::time::Duration;
 use structopt::StructOpt;
 use tokio::prelude::*;
 
-fn parse_number_of_requests(n: &str) -> Result<usize, String> {
-    n.parse::<usize>()
-        .map_err(|_| String::from(""))
-        .and_then(|n| {
-            if n != 0 {
-                Ok(n)
-            } else {
-                Err(String::from("number of requests must be greater than 0"))
-            }
-        })
-}
-
-/// A basic example
+/// A tool for load testing servers
 #[derive(StructOpt, Debug)]
 #[structopt(name = "welle")]
-struct Opt {
+struct Config {
     /// Total number of requests to make
     #[structopt(
         short = "n",
@@ -42,38 +26,37 @@ struct Opt {
     )]
     concurrent_count: usize,
 
+    /// HTTP method to use
+    #[structopt(
+        short = "m",
+        long = "method",
+        default_value = "GET",
+        parse(try_from_str = "parse_method")
+    )]
+    method: Method,
+
     /// URL to request
     #[structopt(name = "URL")]
     url: Url,
 }
 
 fn main() {
-    let opt = Opt::from_args();
-    let config = Config {
-        url: opt.url.into_string(),
-        request_count: opt.request_count,
-        concurrent_count: opt.concurrent_count,
-    };
+    let config = Config::from_args();
 
     tokio::run(run(config));
-}
-
-struct Config {
-    url: String,
-    request_count: usize,
-    concurrent_count: usize,
 }
 
 fn run(config: Config) -> impl Future<Item = (), Error = ()> {
     let client = Client::new();
 
-    let url = config.url;
+    let url = config.url.into_string();
     let request_count = config.request_count;
     let concurrent_count = config.concurrent_count;
+    let method = config.method;
 
     let requests = (0..request_count)
         .into_iter()
-        .map(move |_| make_request(&client, &url));
+        .map(move |_| make_request(&client, &url, &method));
 
     let outcomes = stream::iter_ok(requests)
         .buffer_unordered(concurrent_count)
@@ -90,8 +73,9 @@ fn run(config: Config) -> impl Future<Item = (), Error = ()> {
 fn make_request(
     client: &Client,
     url: &str,
+    method: &Method,
 ) -> impl Future<Item = RequestOutcome, Error = ()> + Send {
-    let request = client.get(url);
+    let request = client.request(method.clone(), url);
 
     timed(request.send()).map(move |(result, duration)| {
         let result = result.map(|resp| resp.status());
@@ -254,4 +238,20 @@ fn percenteil(durations: &Vec<Duration>, percentage: f64) -> Duration {
     } else {
         durations[ceil as usize]
     }
+}
+
+fn parse_method(str: &str) -> Result<Method, String> {
+    Method::try_from(str).map_err(|_| format!("unrecognized method: {}", str))
+}
+
+fn parse_number_of_requests(n: &str) -> Result<usize, String> {
+    n.parse::<usize>()
+        .map_err(|_| String::from(""))
+        .and_then(|n| {
+            if n != 0 {
+                Ok(n)
+            } else {
+                Err(String::from("number of requests must be greater than 0"))
+            }
+        })
 }
