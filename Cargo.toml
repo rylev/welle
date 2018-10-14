@@ -1,7 +1,12 @@
 [package]
 name = "welle"
 version = "0.1.0"
+description = "Welle is a tool for benchmarking servers similar to ApacheBench"
 authors = ["Ryan Levick <ryan.levick@gmail.com>"]
+readme = "README.md"
+keywords = ["benchmark", "http"]
+repository = "https://github.com/rylev/welle"
+license = "MIT"
 edition = "2018"
 
 [dependencies]
